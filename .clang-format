@@ -1,0 +1,64 @@
+---
+BasedOnStyle: Google
+Language: Cpp
+# Indentation
+IndentWidth:     4
+TabWidth:        4
+UseTab:          Never
+ColumnLimit:     80
+
+# Defines the order of categories of #include directives.
+IncludeCategories: 
+  - Regex:           '^<ext/.*\.h>'
+    Priority:        2
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+  - Regex:           '^<.*'
+    Priority:        2
+  - Regex:           '.*'
+    Priority:        3
+
+# Allow short functions in a single line
+AllowShortFunctionsOnASingleLine: InlineOnly
+
+# Allow short blocks in a single line
+AllowShortBlocksOnASingleLine: false
+
+# Allow short if statements in a single line
+AllowShortIfStatementsOnASingleLine: false
+
+# Allow short loops in a single line
+AllowShortLoopsOnASingleLine: false
+
+# Indent case labels in switch statements
+IndentCaseLabels: true
+
+# Break constructors following the ConstructorInitializerIndentWidth
+BreakConstructorInitializers: BeforeComma
+
+# Indent wrapped function names
+IndentWrappedFunctionNames: false
+
+# Sort #includes
+SortIncludes: true
+
+# Align AfterOpenBracket
+AlignAfterOpenBracket: Align
+
+# Penalty for breaking before the first call parameter
+PenaltyBreakBeforeFirstCallParameter: 1
+
+# Penalty for each line break
+PenaltyBreakComment: 10
+
+# Penalty for breaking a function call after a comma
+PenaltyBreakFirstLessLess: 120
+
+# Penalty for each line break inside a comment
+PenaltyExcessCharacter: 1000000
+
+# Penalty for each line break inside a string literal
+PenaltyReturnTypeOnItsOwnLine: 60
+
+# Specify the maximum number of consecutive empty lines to keep
+MaxEmptyLinesToKeep: 1

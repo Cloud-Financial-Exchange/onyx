@@ -1,0 +1,33 @@
+{
+    "Type" : "AWS::EC2::Instance",
+    "Properties" : {
+        "AvailabilityZone": "us-east-2a",
+        "BlockDeviceMappings" : [{
+            "DeviceName" : "/dev/sda1",
+            "Ebs" : {
+                "DeleteOnTermination" : "true",
+                "Encrypted" : "false",
+                "VolumeSize" : 100,
+                "VolumeType" : "gp2"
+            }
+          }
+        ],
+        "IamInstanceProfile": "reads3fromec2",
+        "ImageId" : "ami-0476a3bebc1562489",
+        "InstanceInitiatedShutdownBehavior" : "terminate",
+        "InstanceType" : "c5.2xlarge",
+        "KeyName" : "duclos-zmq",
+        "NetworkInterfaces" : [{
+            "DeleteOnTermination" : "true",
+            "DeviceIndex" : "1",
+            "GroupSet" : ["sg-0e867294009d67cd5"],
+            "PrivateIpAddress" : "172.31.15.101",
+            "SubnetId" : "subnet-0ac7886a4cf779a17"
+        }],
+        "UserData" : {
+            "Fn::Base64": {
+                "Fn::Join": ["", []]
+            }
+        }
+    }
+}

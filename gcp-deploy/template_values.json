@@ -1,0 +1,16 @@
+{
+    "configs": [
+        {
+            "base_client_vm_ip": "10.0.1.0",
+            "base_client_management_ip": "10.1.1.0",
+
+            "base_proxy_vm_ip": "10.0.2.0",
+            "base_proxy_management_ip": "10.1.2.0",
+
+            "base_recipient_vm_ip": "10.0.3.0",
+            "base_recipient_management_ip": "10.1.3.0",
+
+            "port": "34254"
+        }
+    ]
+}

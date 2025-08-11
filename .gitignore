@@ -1,0 +1,12 @@
+.vscode
+.idea
+analysis/tmp2
+
+config/ec2-ips.json
+config/aws_config.json
+
+aws-deploy/_stack*.json
+
+**/.DS_Store
+
+a.out

@@ -1,0 +1,7 @@
+network: projects/multicast1/global/networks/multicast-service
+subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+networkIP: 0.0.0.0
+nicType: GVNIC
+stackType: IPV4_ONLY
+networkPerformanceConfig:
+  totalEgressBandwidthTier: TIER_1  # don't think it works with igb_uio

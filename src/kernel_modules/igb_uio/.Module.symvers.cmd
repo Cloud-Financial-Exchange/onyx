@@ -1,0 +1,1 @@
+cmd_/home/ubuntu/dom-tenant-service/userspace_multicast/kernel_modules/igb_uio/Module.symvers := sed 's/ko$$/o/' /home/ubuntu/dom-tenant-service/userspace_multicast/kernel_modules/igb_uio/modules.order | scripts/mod/modpost -m -a  -o /home/ubuntu/dom-tenant-service/userspace_multicast/kernel_modules/igb_uio/Module.symvers -e -i Module.symvers   -T -

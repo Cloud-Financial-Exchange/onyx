@@ -1,0 +1,35 @@
+{
+    "configs": [
+        {
+            "base_client_vm_ip": "172.25.10.0",
+            "base_proxy_management_ip": "172.25.10.1",
+            "base_proxy_vm_ip": "172.25.12.0",
+            "base_recipient_management_ip": "172.25.13.0",
+            "base_recipient_vm_ip": "172.25.16.232",
+            "port": "34254",
+            "subnet_id": "subnet-014d9a51a64e2b19e",
+            "sg_id": "sg-0e6fa0bdbd2e06e94"
+        },
+        {
+            "base_client_vm_ip": "172.30.10.0",
+            "base_proxy_management_ip": "172.30.10.1",
+            "base_proxy_vm_ip": "172.30.12.0",
+            "base_recipient_management_ip": "172.30.14.0",
+            "base_recipient_vm_ip": "172.30.16.0",
+            "port": "34254",
+            "subnet_id": "subnet-0ac7886a4cf779a17",
+            "sg_id": "sg-0e867294009d67cd5"
+        },
+        {
+            "base_client_vm_ip": "40.0.0.20",
+            "base_proxy_management_ip": "172.31.10.1",
+            "base_proxy_vm_ip": "172.31.12.0",
+            "base_recipient_management_ip": "40.0.0.40",
+            "base_recipient_vm_ip": "40.0.0.40",
+            "port": "34254",
+            "subnet_id": "subnet-076a40e72005095c9",
+            "sg_id": "sg-07818dec92b6d2096",
+            "multicast_ip": "224.0.0.20"
+        }
+    ]
+}

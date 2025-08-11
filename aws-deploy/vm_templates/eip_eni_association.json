@@ -1,0 +1,11 @@
+{
+    "Type" : "AWS::EC2::EIPAssociation",
+    "Properties" : {
+        "AllocationId" : { 
+            "Fn::GetAtt" : [ "EIP_RESOURCE_NAME", "AllocationId" ]
+        },
+        "NetworkInterfaceId" : { 
+            "Ref" : "ENI_RESOURCE_NAME" 
+        }
+    }
+}

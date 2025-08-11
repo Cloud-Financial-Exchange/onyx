@@ -1,0 +1,8 @@
+{
+    "Type" : "AWS::EC2::TransitGatewayMulticastGroupMember",
+    "Properties" : {
+        "GroupIpAddress" : "224.0.0.20",
+        "NetworkInterfaceId" : { "Fn::GetAtt": ["INSTANCE_RESOURCE_NAME", "PrimaryNetworkInterfaceId"] },
+        "TransitGatewayMulticastDomainId" : "tgw-mcast-domain-0cdd805481434380f"
+    }
+}

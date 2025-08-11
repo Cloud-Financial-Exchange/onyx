@@ -1,0 +1,8 @@
+network: projects/multicast1/global/networks/multicast-management
+subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+networkIP: 0.0.0.0
+nicType: GVNIC
+stackType: IPV4_ONLY
+accessConfigs:
+  - name: External NAT
+    type: ONE_TO_ONE_NAT

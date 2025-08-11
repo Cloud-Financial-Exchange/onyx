@@ -1,0 +1,1821 @@
+resources:
+- name: recipient0000
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.0
+      - key: INSTANCE_NUM
+        value: '0'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.0
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.0
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0001
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.1
+      - key: INSTANCE_NUM
+        value: '1'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.1
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0002
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.2
+      - key: INSTANCE_NUM
+        value: '2'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.2
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.2
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0003
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.3
+      - key: INSTANCE_NUM
+        value: '3'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.3
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.3
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0004
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.4
+      - key: INSTANCE_NUM
+        value: '4'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.4
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.4
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0005
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.5
+      - key: INSTANCE_NUM
+        value: '5'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.5
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.5
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0006
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.6
+      - key: INSTANCE_NUM
+        value: '6'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.6
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.6
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0007
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.7
+      - key: INSTANCE_NUM
+        value: '7'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.7
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.7
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0008
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.8
+      - key: INSTANCE_NUM
+        value: '8'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.8
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.8
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0009
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.9
+      - key: INSTANCE_NUM
+        value: '9'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.9
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.9
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0010
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.10
+      - key: INSTANCE_NUM
+        value: '10'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.10
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.10
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0011
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.11
+      - key: INSTANCE_NUM
+        value: '11'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.11
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.11
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0012
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.12
+      - key: INSTANCE_NUM
+        value: '12'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.12
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.12
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0013
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.13
+      - key: INSTANCE_NUM
+        value: '13'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.13
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.13
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0014
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.14
+      - key: INSTANCE_NUM
+        value: '14'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.14
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.14
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0015
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.15
+      - key: INSTANCE_NUM
+        value: '15'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.15
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.15
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0016
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.16
+      - key: INSTANCE_NUM
+        value: '16'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.16
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.16
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0017
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.17
+      - key: INSTANCE_NUM
+        value: '17'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.17
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.17
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0018
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.18
+      - key: INSTANCE_NUM
+        value: '18'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.18
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.18
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance
+- name: recipient0019
+  properties:
+    disks:
+    - autoDelete: true
+      boot: true
+      deviceName: boot
+      initializeParams:
+        sourceImage: projects/multicast1/global/images/devimage5
+      type: PERSISTENT
+    machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+    metadata:
+      items:
+      - key: startup-script
+        value: "#!/bin/bash -xe\n\necho \"Starting script...\"\n\nget_metadata() {\n\
+          \  curl -s -H \"Metadata-Flavor: Google\" \\\n    \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1\"\
+          \n}\n\necho \"Fetching metadata\"\nIP_ADDR=$(get_metadata IP_ADDR)\nINSTANCE_NUM=$(get_metadata\
+          \ INSTANCE_NUM)\nBKT_NAME=$(get_metadata BKT_NAME)\nRUN_MODE=$(get_metadata\
+          \ RUN_MODE)\nCLOUD=$(get_metadata CLOUD)\nBRANCHING_FACTOR=$(get_metadata\
+          \ BRANCHING_FACTOR)\nREDUNDANCY_FACTOR=$(get_metadata REDUNDANCY_FACTOR)\n\
+          TOTAL_NON_REDUNDANT_PROXIES=$(get_metadata TOTAL_NON_REDUNDANT_PROXIES)\n\
+          DUPLICATION_FACTOR=$(get_metadata DUPLICATION_FACTOR)\n\necho \"IP Address:\
+          \ $IP_ADDR\"\necho \"Instance Number: $INSTANCE_NUM\"\necho \"Bucket Name:\
+          \ $BKT_NAME\"\necho \"Run Mode: $RUN_MODE\"\necho \"Cloud: $CLOUD\"\necho\
+          \ \"Branching Factor: $BRANCHING_FACTOR\"\necho \"Redundancy Factor: $REDUNDANCY_FACTOR\"\
+          \necho \"Total Non-redundant Proxies: $TOTAL_NON_REDUNDANT_PROXIES\"\necho\
+          \ \"Duplication Factor: $DUPLICATION_FACTOR\"\n\necho \"Downloading service\
+          \ bundle\"\ncd /home/ubuntu\nsudo rm -rf dom-tenant-service/\nsudo mkdir\
+          \ dom-tenant-service/\nsudo chmod 777 dom-tenant-service/\nsudo chown -R\
+          \ root:root ./dom-tenant-service\n\ngcloud storage cp gs://cdm-templates-nyu-systems-multicast/bundled_proj.tar.gz\
+          \ .\ntar -xzf bundled_proj.tar.gz -C dom-tenant-service/\nexport HOME=/root\n\
+          \necho \"Capturing NIC info\"\ncat /sys/class/net/ens5/address > mac.txt\n\
+          cat /sys/class/net/ens4/address > macsocket.txt\nip -o -4 addr show dev\
+          \ ens5 | cut -d' ' -f7 | cut -d'/' -f1 > ip.txt\nip -o -4 addr show dev\
+          \ ens4 | cut -d' ' -f7 | cut -d'/' -f1 > ipsocket.txt\n\necho \"Binding\
+          \ ens5 to igb_uio\"\nsudo modprobe uio\nsudo modprobe igb_uio\nPCI_ADDR=$(ethtool\
+          \ -i ens5 | grep bus-info | awk '{print $2}')\nip link set dev ens5 down\n\
+          \ncommand -v dpdk-devbind.py >/dev/null 2>&1 || {\n  echo >&2 \"dpdk-devbind.py\
+          \ not found! Aborting.\";\n  exit 1;\n}\n\nsudo dpdk-devbind.py --bind=igb_uio\
+          \ $PCI_ADDR\nsudo dpdk-devbind.py --status\n\necho \"Setting up hugepages\"\
+          \n[ -d /mnt/huge ] || sudo mkdir /mnt/huge\nmount | grep -q '/mnt/huge'\
+          \ || sudo mount -t hugetlbfs -o pagesize=1G none /mnt/huge\ndpdk-hugepages.py\
+          \ -s\n\necho \"Deploying ttcs\"\ncd dom-tenant-service/gcp-deploy\nsudo\
+          \ chmod +x ../aws-deploy/stats_to_s3.sh\nsudo chmod +x ./deploy_ttcs.sh\n\
+          sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg $IP_ADDR\n\ncd ..\ncp ./../mac.txt\
+          \ ./config/mac.txt\ncp ./../macsocket.txt ./config/macsocket.txt\ncp ./../ip.txt\
+          \ ./config/ip.txt\ncp ./../ipsocket.txt ./config/ipsocket.txt\ncd ./src\n\
+          \necho \"Compiling receiver\"\nmake multicast_receivers\n\necho \"Enabling\
+          \ TCP BBR\"\nsudo modprobe tcp_bbr\nsudo sysctl -w net.ipv4.tcp_congestion_control=bbr\n\
+          \necho \"Starting receiver\"\n./build/multicast_receivers $INSTANCE_NUM\
+          \ $DUPLICATION_FACTOR $RUN_MODE $BRANCHING_FACTOR $REDUNDANCY_FACTOR $TOTAL_NON_REDUNDANT_PROXIES\
+          \ $CLOUD\n"
+      - key: IP_ADDR
+        value: 10.1.3.19
+      - key: INSTANCE_NUM
+        value: '19'
+      - key: BKT_NAME
+        value: cdm-templates-nyu-systems-multicast
+      - key: RUN_MODE
+        value: dpdk
+      - key: CLOUD
+        value: gcp
+      - key: BRANCHING_FACTOR
+        value: '10'
+      - key: REDUNDANCY_FACTOR
+        value: '0'
+      - key: TOTAL_NON_REDUNDANT_PROXIES
+        value: '11'
+      - key: DUPLICATION_FACTOR
+        value: '1'
+    networkInterfaces:
+    - accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      network: projects/multicast1/global/networks/multicast-management
+      networkIP: 10.1.3.19
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-management
+    - network: projects/multicast1/global/networks/multicast-service
+      networkIP: 10.0.3.19
+      networkPerformanceConfig:
+        totalEgressBandwidthTier: TIER_1
+      nicType: GVNIC
+      stackType: IPV4_ONLY
+      subnetwork: projects/multicast1/regions/us-east4/subnetworks/multicast-service
+    serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    zone: us-east4-c
+  type: compute.v1.instance

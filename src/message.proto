@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+enum MessageType {
+    REQ_UNKNOWN = 0;
+    ACK_UNKNOWN = 1;
+    REQ_MAC_COLLECTION = 2;  // requests the mac collection
+    ACK_MAC_COLLECTION = 3;
+    REQ_MAC_ADDRESS = 4;
+    ACK_MAC_ADDRESS = 5;
+    REQ_STATS_COLLECTION = 6;
+    ACK_STATS_COLLECTION = 7;
+    REQ_ACK_MAC_COLLECTION = 8;  // requests the ack for mac collection
+    START_ORDERS_SUBMISSION = 9;
+    ACK_START_ORDERS_SUBMISSION = 10;
+
+    REQ_MAC_COLLECTION_STATUS = 11;
+    ACK_MAC_COLLECTION_STATUS = 12;
+    NACK_MAC_COLLECTION_STATUS = 13;
+}
+
+message Msg {
+    int64 msg_id = 1;
+    int64 client_send_time = 2;
+    int32 recipient_id = 3;
+    int64 root_send_time = 4;
+    int32 msg_type = 5; // 0=> for sending msgs, 1=> for requesting stats
+    int32 is_from_hedge_node = 6; // 1 => true, 2 => false (see issue #28)
+    int64 experiment_starting_msg_id = 7;
+    int64 deadline = 8;
+    int64 downstream = 9;
+}
+
+message StatsFields {
+    int64 latency = 1;
+    int64 release_time = 2;
+    int32 holding_duration = 3;
+    int64 deadline = 4;
+}
+
+message Stats {
+    int32 recipient_id = 1;
+    map<int64, StatsFields> records = 2;
+    int64 total_msgs = 3;
+}
+
+message ManagementMsg {
+    string mac_address = 1;
+    string ip_address = 2;
+    map<string, string> addrs = 3;
+    int32 msg_type = 4;  // 2 => for sending/requesting mac, 3 => here are macs, 4 => mac collection (from client), 5 => collect stat
+    bool stop = 5; // receivers don't need a reply back so they send stop=true to the client
+    repeated string request = 6;
+    string data = 7;
+    StartOrdersSubmission order_sub_req = 8;
+}
+
+message HedgingHint {
+    int32 proxy_num = 1;
+    float intensity = 2;
+}
+
+message HoldreleaseHint {
+    int32 index = 1;  // can be a proxy as well as a receiver
+    repeated int32 owd_estimates = 2;
+}
+
+message StartOrdersSubmission {
+    uint64 request_id = 1;
+    int32 rate = 2;
+    int32 experiment_duration = 3;
+    uint64 start_timestamp = 4;
+    int32 bid_range_start = 5;
+    int32 bid_range_end = 6;
+    int32 ask_range_start = 7;
+    int32 ask_range_end = 8;
+    int32 fixed_interarrival = 9;
+    bool use_fancypq = 10;
+}
+
+message ManagementToDataplane {
+    StartOrdersSubmission order_sub_req = 1;
+}

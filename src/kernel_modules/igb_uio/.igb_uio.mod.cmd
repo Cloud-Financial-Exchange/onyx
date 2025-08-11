@@ -1,0 +1,1 @@
+cmd_/home/ubuntu/dom-tenant-service/userspace_multicast/kernel_modules/igb_uio/igb_uio.mod := printf '%s\n'   igb_uio.o | awk '!x[$$0]++ { print("/home/ubuntu/dom-tenant-service/userspace_multicast/kernel_modules/igb_uio/"$$0) }' > /home/ubuntu/dom-tenant-service/userspace_multicast/kernel_modules/igb_uio/igb_uio.mod

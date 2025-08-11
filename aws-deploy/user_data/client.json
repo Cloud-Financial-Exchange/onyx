@@ -1,0 +1,20 @@
+[
+    "#!/bin/bash -xe\n",
+    "cd home/ubuntu\n",
+    "# >>>>we can later remove rm/mkdir when the image is configured accordingly\n",
+    "sudo rm -rf dom-tenant-service/\n",
+    "sudo mkdir dom-tenant-service/\n",
+    "sudo chmod 777 dom-tenant-service/ \n",
+    "sudo chown -R root:root ./dom-tenant-service\n",
+    "aws s3 cp s3://BKT_NAME/bundled_proj.tar.gz .\n",
+    "tar -xzf bundled_proj.tar.gz -C dom-tenant-service/\n",
+    "export HOME=/root\n",
+    "cd dom-tenant-service/\n",
+    "cd aws-deploy\n",
+    "sudo chmod +x ./stats_to_s3.sh\n",
+    "sudo chmod +x ./deploy_ttcs.sh\n",
+    "sudo ./deploy_ttcs.sh ./assets/ttcs-agent.cfg IP_ADDR\n",
+    "cd ..\n",
+    "cd src\n",
+    "make multicast_client\n"
+]

@@ -1,0 +1,9 @@
+{
+    "Type" : "AWS::EC2::NetworkInterface",
+    "Properties" : {
+        "SubnetId" : "subnet-0ac7886a4cf779a17",
+        "PrivateIpAddress": "REPLACE",
+        "GroupSet": ["sg-0e867294009d67cd5"],
+        "SourceDestCheck": false
+    }
+}

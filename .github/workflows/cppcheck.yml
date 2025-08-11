@@ -1,0 +1,17 @@
+name: cppchecks
+on:
+  push:
+    branches:
+    - '**'
+  pull_request:
+    branches:
+    - '**'
+jobs:
+  cpplint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+    - run: pip install cpplint==1.5.5
+    - run: cpplint --recursive --exclude analysis/ --exclude analysis-me/ --exclude src/build --exclude src/kernel_modules --exclude src/nlohmann --exclude src/multicast_receiver/xdp-deduplication.c --exclude src/multicast_proxy/tc-replication.c --exclude src/cameron314/readerwriterqueue.h --exclude src/cameron314/atomicops.h src
+

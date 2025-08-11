@@ -1,0 +1,24 @@
+name: REPLACE
+type: compute.v1.instance
+properties:
+  zone: us-east4-c
+  # machineType: zones/us-east4-c/machineTypes/c2d-standard-4
+  machineType: zones/us-east4-c/machineTypes/c2d-highcpu-8
+  serviceAccounts:
+    - email: multicast-service-vm@multicast1.iam.gserviceaccount.com
+      scopes:
+        - https://www.googleapis.com/auth/cloud-platform
+  disks:
+    - deviceName: boot
+      type: PERSISTENT
+      boot: true
+      autoDelete: true
+      initializeParams:
+        # sourceImage: projects/multicast1/global/images/multicast-ebpf-zmq-grub-disk
+        # sourceImage: projects/multicast1/global/images/multicast-ebpf-zmq-grub ## using this to save memory as i am not using dpdk
+        sourceImage: projects/multicast1/global/images/devimage5 # created from disk of dev2 vm
+  networkInterfaces:
+  metadata:
+    items:
+      - key: startup-script-url
+        value: REPLACE
