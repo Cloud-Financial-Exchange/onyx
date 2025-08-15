@@ -1,3 +1,8 @@
+## For SIGCOMM Artifact Evaluation
+
+Screen-recording of performing LOQ vs SimplePQ experiment: https://drive.google.com/file/d/10Dj5JegVj_nPwQDfX3M13ls0BzEv7Kj2/view?usp=sharing
+
+
 ## Usage
 
 #### On AWS
