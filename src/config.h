@@ -113,8 +113,8 @@ namespace ORDERS_SUBMISSION {
     const bool DYNAMIC_PACING = false;
     bool BURST_MODE = true;
     const int BURST_FACTOR = 20;
-    const int QTYPE = 0;  // 0 for simplepq, 1 for fancy(i.e., LOQv1), 2 for LOQv2
-    const int MID_PRICE = 7;
+    const int QTYPE = 0;  // 0 for simplepq, 1 for fancypq/loq
+    const int MID_PRICE = 5;
     const int ACTION_WINDOW = 0;
     const int OWD_THRESH = 70;
     const bool PROXY_SEQUENCE = false;  // do we want the proxies to do sequencing?

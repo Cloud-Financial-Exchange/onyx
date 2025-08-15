@@ -383,8 +383,8 @@ int main(int argc, char* argv[]) {
     rlim_t fd_num = 8192;
     u_int experiment_time_in_seconds = 0;
     u_int starting_msg_id = 0;
-    std::vector<int32_t> bid_range = {1, 7};
-    std::vector<int32_t> ask_range = {7, 13};  // will be modified later on to accomodate action window
+    std::vector<int32_t> bid_range = {1, 5};
+    std::vector<int32_t> ask_range = {5, 9};  // will be modified later on to accomodate action window
     bool fixed_interarrival = false;
 
     app.add_option("-a,--action", action, "Action to perform")
