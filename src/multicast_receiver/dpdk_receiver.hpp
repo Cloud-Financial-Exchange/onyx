@@ -16,14 +16,11 @@
 
 static const struct rte_eth_conf port_conf_default = {
     .rxmode = {.max_lro_pkt_size = RTE_ETHER_MAX_LEN},
-    .txmode = {
-        .offloads = RTE_ETH_TX_OFFLOAD_IPV4_CKSUM,
-    },
 };
 
 constexpr rte_be16_t DPDK_UDP_DST_PORT = 0xce85;
 int PORT_ID = 0;
-const int NUM_WORKERS = 1;  // loss exp working requires it to be 1
+const int NUM_WORKERS = 2;
 struct rte_ring *packetQueue;
 const int START_OF_UDPHDR_IN_PKT = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr);
 
@@ -34,12 +31,9 @@ const int START_OF_UDPHDR_IN_PKT = sizeof(struct rte_ether_hdr) + sizeof(struct 
  */
 static inline int port_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     struct rte_eth_conf port_conf = port_conf_default;
-    if (CONFIG::CLOUD == "gcp")
-        port_conf.txmode = {};
-
     const uint16_t rx_rings = 1, tx_rings = 1;
     uint16_t nb_rxd = RX_RING_SIZE;
-    uint16_t nb_txd = TX_RING_SIZE;
+    uint16_t nb_txd = 8192;
     int retval;
     uint16_t q;
 
@@ -50,9 +44,9 @@ static inline int port_init(uint16_t port, struct rte_mempool *mbuf_pool) {
         return -1;
 
     rte_eth_dev_info_get(port, &dev_info);
-    // if (dev_info.tx_offload_capa & RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE) {
-    //     port_conf.txmode.offloads |= RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE;
-    // }
+    if (dev_info.tx_offload_capa & RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE) {
+        port_conf.txmode.offloads |= RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE;
+    }
 
     /* Configure the Ethernet device. */
     retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
@@ -74,14 +68,6 @@ static inline int port_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     // Allocate and set up 1 TX queue
     txconf = dev_info.default_txconf;
     txconf.offloads = port_conf.txmode.offloads;
-
-    if (CONFIG::CLOUD == "gcp") {
-        // GCP's gvNIC limitations
-        txconf.tx_free_thresh = nb_txd - 4;
-    } else {
-        txconf.tx_free_thresh = TX_RING_SIZE/2;
-    }
-
     for (q = 0; q < tx_rings; q++) {
         retval = rte_eth_tx_queue_setup(port, q, nb_txd,
                                         rte_eth_dev_socket_id(port), &txconf);
@@ -163,12 +149,6 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
     int total_proxies_without_redundant_nodes, int redundancy_factor, int m, int port,
     std::unordered_map<uint16_t, int32_t> port_id_map) {
 
-    cpu_set_t cpuset;
-    int main_core = rte_get_main_lcore();
-    CPU_ZERO(&cpuset);
-    CPU_SET(main_core, &cpuset);
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-
     auto holdrelease = new Holdrelease(recipient_id, total_proxies_without_redundant_nodes,
         redundancy_factor, m, Role::RECEIVER, 1);
     auto holdrelease_send_thread = std::thread([holdrelease] {holdrelease->send_estimates();});
@@ -177,8 +157,6 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
     int total_launched = 0;
     int curr_lcore = 0;
     int first_worker_lcore = 0;
-
-    std::vector<std::thread> threads;
 
     while (total_launched < NUM_WORKERS) {
         if ((unsigned int)curr_lcore == rte_get_main_lcore()) {
@@ -199,8 +177,6 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
             .port_id_map = port_id_map
         };
 
-
-
         int e = rte_eal_remote_launch(worker_thread, args, args->worker_id);
         if (e != 0) {
             std::cerr << "Remote launch error: " << e << " on: " << args->worker_id << std::endl;
@@ -210,11 +186,8 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
         total_launched++;
     }
 
-    // threads.emplace_back(std::thread([&all_stats]{
-    //     record_lost_messages(all_stats);  // too heavy, puts backpressure
-    // }));
-
     int enqueue_failures = 0;
+    std::vector<std::thread> threads;
 
     if (true == CONFIG::LOGGING) {
         threads.emplace_back(std::thread([&enqueue_failures] {
@@ -227,7 +200,6 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
         }));
     }
 
-    // isolate_main_core(main_core);
     std::unordered_map<uint16_t, std::set<int64_t>> seen_msg_ids;
     seen_msg_ids.reserve(100);
 
@@ -252,12 +224,11 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
 
                 MsgDp* msg = rte_pktmbuf_mtod_offset(bufs[i], MsgDp*, DATA_OFFSET_IN_PKT);
 
-                if (!CONFIG::LOSS_EXPERIMENT::EXP &&
-                    seen_msg_ids[udp_hdr->dst_port].find(msg->msg_id()) != seen_msg_ids[udp_hdr->dst_port].end()) {
+                if (seen_msg_ids[udp_hdr->dst_port].find(msg->msg_id()) != seen_msg_ids[udp_hdr->dst_port].end()) {
                     rte_pktmbuf_free(bufs[i]);
                     continue;
                 } else {
-                    if (!CONFIG::LOSS_EXPERIMENT::EXP) msg->set_recv_time(get_current_time());
+                    msg->set_recv_time(get_current_time());
 
                     if (CONFIG::SIMULATE_TRADING && msg->msg_id() > (CONFIG::MSG_RATE * 10)) {
                         auto tp = retrieve_trade_point(msg);
@@ -266,10 +237,9 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
 
                     if (CONFIG::LOGGING) Logging::RECVD.fetch_add(1);
                     if (0 != rte_ring_enqueue(packetQueue, reinterpret_cast<void *>(bufs[i]))) enqueue_failures += 1;
-                    if (!CONFIG::LOSS_EXPERIMENT::EXP)
-                        seen_msg_ids[udp_hdr->dst_port].insert(msg->msg_id());
+                    seen_msg_ids[udp_hdr->dst_port].insert(msg->msg_id());
 
-                    if (!CONFIG::LOSS_EXPERIMENT::EXP && msg->_history > 0 &&
+                    if (msg->_history > 0 &&
                     seen_msg_ids[udp_hdr->dst_port].find(msg->msg_id()-1) == seen_msg_ids[udp_hdr->dst_port].end()) {
                         seen_msg_ids[udp_hdr->dst_port].insert(msg->msg_id() - 1);
                         if (CONFIG::LOGGING) Logging::REORDERED.fetch_add(1);
@@ -281,7 +251,7 @@ void receive_and_log_packets(int recipient_id, std::vector<StatsDp>& all_stats, 
     }
 
     for (auto& thr : threads) {
-        if (thr.joinable()) thr.join();
+        thr.join();
     }
 }
 
@@ -302,7 +272,7 @@ int dpdk_receiver(int32_t recipient_id, int32_t duplication_factor, std::string 
         "MBUF_POOL", NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0,
         RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
 
-    packetQueue = rte_ring_create("PacketQueue", 131072, rte_socket_id(), RING_F_SP_ENQ | RING_F_MC_HTS_DEQ);
+    packetQueue = rte_ring_create("PacketQueue", 4096, rte_socket_id(), RING_F_SP_ENQ | RING_F_MC_RTS_DEQ);
     if (packetQueue == NULL)
         rte_panic("Cannot create packet queue\n");
 
@@ -316,7 +286,7 @@ int dpdk_receiver(int32_t recipient_id, int32_t duplication_factor, std::string 
 
     signal(SIGINT, exit_stats);
 
-    all_stats.resize(NUM_WORKERS);  // removed +1
+    all_stats.resize(NUM_WORKERS+1);
 
     auto [recipient_ip, recipient_ports] = get_logical_receiver_ip_ports_for_physical_receiver(
         recipient_id, duplication_factor);

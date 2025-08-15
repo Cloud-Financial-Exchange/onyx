@@ -3,12 +3,9 @@
 #ifndef SRC_MESSAGE_H_
 #define SRC_MESSAGE_H_
 
-#include <iostream>
 #include <cstdint>
 #include <map>
-#include <utility>
 #include <vector>
-#include "cameron314/readerwriterqueue.h"
 
 // Msg for Data plane. We use protobuf for non-dataplane purposes
 struct MsgDp {
@@ -66,14 +63,6 @@ struct StatsDp {
     int64_t total_msgs;
     std::map<int64_t, StatsFieldsDp> records;
     std::vector<StatsFieldsDp> records2;  // temporary fix required for supporting logical receivers
-
-    /*Used For loss Experiment*/
-    std::vector<std::pair<int64_t, int64_t>> q;  // msg id, ts
-    StatsDp() : q() {
-        std::clog << "Allocating " << (250'000'000.0*16.0/(1'000'000'000)) << "GBytes" << std::endl;
-        q.resize(250'000'000);
-        q.resize(0);
-    }
 };
 
 struct StartMsgsDp {

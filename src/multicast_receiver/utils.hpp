@@ -3,18 +3,7 @@
 #ifndef SRC_MULTICAST_RECEIVER_UTILS_HPP_
 #define SRC_MULTICAST_RECEIVER_UTILS_HPP_
 
-#include <sched.h>
-#include <unistd.h>
-#include <dirent.h>
 #include <string>
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <utility>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <set>
 
 #include "./../utils/common.hpp"
 #include "./../utils/holdrelease.hpp"
@@ -30,11 +19,6 @@ struct ReceivedMessage {
 void handle_message_and_log_it(
     MsgDp* msg, int64_t reception_time, std::string& mode,
     int worker_id, Holdrelease *holdrelease, StatsDp* stats, int recipient_id, bool record_latency = true) {
-    if (CONFIG::LOSS_EXPERIMENT::EXP) {
-        stats->q.push_back(std::make_pair(msg->msg_id(), msg->root_send_time()));
-        return;
-    }
-
     int msg_holding_duration = 0;  // microseconds
     int64_t msg_release_time = reception_time;
 
@@ -121,6 +105,5 @@ int multicast_socket_setup(std::string receiver_ip) {
 
     return udp_socket;
 }
-
 
 #endif  // SRC_MULTICAST_RECEIVER_UTILS_HPP_

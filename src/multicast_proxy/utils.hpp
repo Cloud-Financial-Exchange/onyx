@@ -55,28 +55,6 @@ class Mcastmessages {
 
         return msg;
     }
-
-    void get_msg(MsgDp& msg, int i) {
-        msg.set_msg_id(i + starting_msg_id);
-        auto t = get_current_time();
-        msg.set_root_send_time(t);
-        if (CONFIG::LOSS_EXPERIMENT::EXP) return;
-        msg.set_client_send_time(t);
-        msg.set_deadline(t);
-        msg.set_is_from_hedge_node(2);
-        msg.set_msg_type(0);
-        msg.set_recipient_id(0);
-        msg._history = 0;
-
-        if (CONFIG::HEDGING::MSG_HISTORY && history.size()) {
-            msg._history = history.back();
-            history.pop_back();
-        }
-
-        if (CONFIG::HEDGING::MSG_HISTORY) history.push_back(t);
-
-        return;
-    }
 };
 
 struct Context {

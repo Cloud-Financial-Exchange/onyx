@@ -15,7 +15,6 @@
 #include <string>
 #include <tuple>
 
-#include "./../utils/fastmap.hpp"
 #include "./delaymonitor.hpp"
 #include "./gfifo_sequencer.hpp"
 #include "./noop_sequencer.hpp"
@@ -34,8 +33,8 @@ class Matchingengine {
     uint64_t logs_flush_threshold;
     uint64_t last_flush;
 
-    // std::unordered_map<uint64_t, OrderMsg> orders;  // {order id, order}
-    Fastmap orders;
+    std::mutex mtx_orders;
+    std::unordered_map<uint64_t, OrderMsg> orders;  // {order id, order}
 
     std::mutex mtx_qs;
     std::map<
@@ -114,7 +113,8 @@ Matchingengine::Matchingengine(std::string proxy_ip, size_t starting_children_in
 void Matchingengine::enqueue(uint64_t order_id) {
     OrderMsg order;
     {
-        order = orders.get(order_id);
+        std::lock_guard<std::mutex> lock(mtx_orders);
+        order = orders[order_id];
     }
 
     auto curr_time = static_cast<uint64_t>(get_current_time());
@@ -122,11 +122,11 @@ void Matchingengine::enqueue(uint64_t order_id) {
 
     std::lock_guard<std::mutex> lock(mtx_qs);
     if (order.is_bid) {
-        // if (order.timestamp < sequenced_bids[order.price]) out_of_orders.fetch_add(1);
+        if (order.timestamp < sequenced_bids[order.price]) out_of_orders.fetch_add(1);
         auto& pq = bids_qs[order.price];
         pq.push({curr_time, order.id});
     } else {
-        // if (order.timestamp < sequenced_asks[order.price]) out_of_orders.fetch_add(1);
+        if (order.timestamp < sequenced_asks[order.price]) out_of_orders.fetch_add(1);
         auto& pq = asks_qs[order.price];
         pq.push({curr_time, order.id});
     }
@@ -153,7 +153,8 @@ void Matchingengine::receive_orders() {
 
         OrderMsg* order = reinterpret_cast<OrderMsg*>(message.data());
         if (false == CONFIG::ORDERS_SUBMISSION::STRESS_TEST) {
-            orders.insert(order->id, *order);
+            std::lock_guard<std::mutex> lock(mtx_orders);  // make mtx_orders concurrent to remove contention please
+            orders[order->id] = *order;
         }
 
         gfifo_sequencer->enqueue(
@@ -182,7 +183,7 @@ void Matchingengine::get_sequencer_output() {
         // curr = ts;
         if (CONFIG::ORDERS_SUBMISSION::STRESS_TEST) {
             auto curr_time = static_cast<uint64_t>(get_current_time());
-            if (critical) {
+            if (true || critical) {
                 if (false == critical_orders_owd.enqueue({curr_time, curr_time-ts})) {
                     std::cerr << "Could not enqueue to critical_orders_owd" << std::endl;
                 }
@@ -233,12 +234,12 @@ void Matchingengine::match_orders() {
         // 3. Generate announcement (todo)
 
         {
-            ts_bid = orders.get(id_bid).timestamp;  // timestamp of order generation
-            ts_ask = orders.get(id_ask).timestamp;
+            std::lock_guard<std::mutex> lock(mtx_orders);
+            ts_bid = orders[id_bid].timestamp;  // timestamp of order generation
+            ts_ask = orders[id_ask].timestamp;
 
-
-            // sequenced_bids[price_bid] = std::max(sequenced_bids[price_bid], ts_bid);
-            // sequenced_asks[price_ask] = std::max(sequenced_asks[price_ask], ts_ask);
+            sequenced_bids[price_bid] = std::max(sequenced_bids[price_bid], ts_bid);
+            sequenced_asks[price_ask] = std::max(sequenced_asks[price_ask], ts_ask);
             counter_matched.fetch_add(2);
 
             pq_bid.pop();

@@ -468,7 +468,7 @@ int main(int argc, char* argv[]) {
 
         close(sockfd);
 
-        sleep(10 + (experiment_time_in_seconds));
+        sleep(5 + (2*experiment_time_in_seconds));
         std::cout << "Run request_stats" << std::endl;
         stats_controller(folder_prefix);
     }

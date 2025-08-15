@@ -83,7 +83,6 @@ void Ordergeneration::start(int experiment_time_in_seconds, int rate, uint64_t o
 
     double burst_rate = rate * CONFIG::ORDERS_SUBMISSION::BURST_FACTOR;
     double burst_duration = 1.0;   // Burst duration in seconds
-    // double burst_interval = 5;  // Time between bursts in seconds
     double burst_interval = 3.0;  // Time between bursts in seconds
 
     std::random_device rd;

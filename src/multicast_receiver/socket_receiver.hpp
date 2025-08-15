@@ -121,9 +121,6 @@ int socket_receiver(int32_t recipient_id, int32_t duplication_factor, std::strin
     std::vector<std::thread> receiver_threads(recipient_ports.size());
 
     all_stats.resize(recipient_ports.size());
-    // std::thread recording([]{
-    //     record_lost_messages(all_stats);
-    // });
 
     for (int i = 0; i < static_cast<int>(recipient_ports.size()); i++) {
         receiver_threads[i] = std::thread(receive_and_process_messages, recipient_id + i, recipient_ip,
@@ -177,8 +174,6 @@ int socket_receiver(int32_t recipient_id, int32_t duplication_factor, std::strin
     for (int k = 0; k < static_cast<int>(receiver_threads.size()); ++k) {
         receiver_threads[k].join();
     }
-
-    // if (recording.joinable()) recording.join();
 
     return 0;
 }

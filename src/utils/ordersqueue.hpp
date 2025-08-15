@@ -23,9 +23,9 @@
 #include "./fastmap.hpp"
 #include "./../utils/common.hpp"
 
-using sequencer_type = Gfifosequencer;
+// using sequencer_type = Gfifosequencer;
 // using sequencer_type = Noopsequencer;
-// using sequencer_type = Cloudexsequencer;
+using sequencer_type = Cloudexsequencer;
 
 typedef std::tuple<bool, uint64_t, uint64_t> QELE_T;  // critical(0,1), order-time, orderid
 

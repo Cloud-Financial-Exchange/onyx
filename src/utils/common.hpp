@@ -3,7 +3,6 @@
 #ifndef SRC_UTILS_COMMON_HPP_
 #define SRC_UTILS_COMMON_HPP_
 
-#include <dirent.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
 #include <liburing.h>
@@ -40,7 +39,6 @@
 #include <string>
 #include <thread>   // NOLINT(build/c++11)
 #include <vector>
-#include <regex>  // NOLINT(build/c++11)
 
 #include "./../nlohmann/json.hpp"
 #include "./../build/message.pb.h"
@@ -59,7 +57,7 @@
 
 #define NUM_MBUFS 131071  // 262143
 #define MBUF_CACHE_SIZE 32
-#define MBUF_SIZE 1024
+#define MBUF_SIZE 512
 #define HEADERS_MBUF_SIZE (sizeof(rte_udp_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_ether_hdr))
 #define BURST_SIZE 32
 
@@ -111,69 +109,6 @@ extern Status status;
 std::unordered_map<int, std::mutex> stat_mutexes;
 std::vector<StatsDp> all_stats;
 std::atomic<int> total_messages_from_hedge_nodes = 0;
-
-namespace fs = std::filesystem;
-
-void isolate_main_core(int main_core_id) {
-    // 2. Move all other processes off the main core
-    DIR* proc = opendir("/proc");
-    if (!proc) {
-        perror("Failed to open /proc");
-        return;
-    }
-
-    struct dirent* ent;
-    while ((ent = readdir(proc)) != nullptr) {
-        if (ent->d_type == DT_DIR) {
-            std::string name(ent->d_name);
-            if (std::all_of(name.begin(), name.end(), ::isdigit)) {
-                pid_t pid = std::stoi(name);
-                if (pid == getpid()) continue;  // skip self
-
-                cpu_set_t current_aff;
-                if (sched_getaffinity(pid, sizeof(cpu_set_t), &current_aff) != 0)
-                    continue;
-
-                if (CPU_ISSET(main_core_id, &current_aff)) {
-                    CPU_CLR(main_core_id, &current_aff);
-                    if (sched_setaffinity(pid, sizeof(cpu_set_t), &current_aff) == 0) {
-                        std::cout << "[INFO] Moved PID " << pid << " off core " << main_core_id << std::endl;
-                    }
-                }
-            }
-        }
-    }
-    closedir(proc);
-
-    // 3. Move IRQs off the main core
-    std::regex irq_dir_regex("^[0-9]+$");
-    for (const auto& entry : fs::directory_iterator("/proc/irq")) {
-        if (!fs::is_directory(entry)) continue;
-
-        std::string irq = entry.path().filename();
-        if (!std::regex_match(irq, irq_dir_regex)) continue;
-
-        std::string affinity_path = entry.path().string() + "/smp_affinity";
-        std::ifstream in(affinity_path);
-        if (!in) continue;
-
-        std::string affinity_hex;
-        in >> affinity_hex;
-        in.close();
-
-        // Convert to bitmask, clear bit for main_core_id
-        unsigned long mask = std::stoul(affinity_hex, nullptr, 16);  // NOLINT
-        mask &= ~(1UL << main_core_id);
-
-        std::ofstream out(affinity_path);
-        if (out) {
-            out << std::hex << mask;
-            std::cout << "[INFO] Cleared core " << main_core_id << " from IRQ " << irq << std::endl;
-        }
-    }
-
-    std::cout << "[INFO] Core " << main_core_id << " isolated (processes + IRQs)" << std::endl;
-}
 
 uint32_t string_to_ip(char *s, bool reverse = false) {
     unsigned char a[4];
@@ -1017,28 +952,6 @@ static std::string stats_to_csv(StatsDp& stats) {
     return csv_ss.str();
 }
 
-void append_missing_messages_to_csv_file(int receiver_id, StatsDp &stats) {
-    std::ofstream outfile;
-    std::string folder(stats_folder);
-    std::string filename = folder + "/" + std::to_string(receiver_id) + ".csv";
-    outfile.open(filename, std::ios::out | std::ios_base::app);
-
-    std::sort(stats.q.begin(), stats.q.end());
-    auto& q = stats.q;
-
-    outfile << "HEADER:Recipientid,MsgID1,MsgID2,TS1,TS2\n";
-    for (size_t i = 1; i < q.size(); i++) {
-        if (q[i].first != q[i-1].first + 1) {
-            outfile << std::to_string(stats.recipient_id)
-            << "," << q[i-1].first << "," << q[i].first
-            << "," << q[i-1].second << "," << q[i].second << std::endl;
-        }
-    }
-
-    q.clear();
-    outfile.close();
-}
-
 // receiver_id acts as worker id in the case of dpdk receiver
 void append_stat_to_csv_file_with_id(int receiver_id, StatsDp &stats) {
     if (stats.records2.empty()) {
@@ -1069,14 +982,6 @@ void upload_stat_to_s3(int receiver_id, std::string folder) {
 
 void flush_stats_to_local_and_s3(int receiver_id, std::string s3_folder) {
     auto original_receiver_id = receiver_id;
-    if (CONFIG::LOSS_EXPERIMENT::EXP) {
-        std::clog << all_stats.size() << " all_stats size" << std::endl;
-        assert(all_stats.size() >= 1);
-        append_missing_messages_to_csv_file(receiver_id, all_stats.at(0));
-        upload_stat_to_s3(original_receiver_id, s3_folder);
-        return;
-    }
-
     // One file per VM in S3
     for (auto &stat : all_stats) {
         append_stat_to_csv_file_with_id(receiver_id++, stat);

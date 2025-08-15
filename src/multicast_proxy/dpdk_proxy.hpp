@@ -23,8 +23,6 @@
 constexpr rte_be16_t DPDK_UDP_DST_PORT = 0xce85;
 Status status = Status::BLOCKED;
 
-int enqueue_failures = 0;
-
 /*  DPDK related */
 
 static const struct rte_eth_conf port_conf_default = {
@@ -78,7 +76,6 @@ static inline int port_init(uint16_t port, struct rte_mempool *mbuf_pool) {
         return -1;
 
     rte_eth_dev_info_get(port, &dev_info);
-    printf("Max TX queues: %u\n", dev_info.max_tx_queues);
     // if (dev_info.tx_offload_capa & RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE) {
     //     port_conf.txmode.offloads |= RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE;
     // }
@@ -146,8 +143,9 @@ void prepare_and_transmit(
     std::vector<std::vector<uint8_t>>& fast_macs, uint32_t &src_ip,
     std::vector<uint8_t>& src_mac, struct rte_mempool *clone_pool,
     struct rte_mempool *header_pool, bool is_redundant,
-    bool is_leaf_node, int tx_queue_id, bool free_pkt = true) {
-    // assert(pkt != NULL);
+    bool is_leaf_node, int tx_queue_id) {
+    assert(pkt != NULL);
+
     std::vector<std::pair<uint32_t, rte_be16_t>>* ips_ports;
     std::vector<std::vector<uint8_t>>* macs;
 
@@ -187,8 +185,7 @@ void prepare_and_transmit(
         add_trade_information(msg, ctx);
     }
 
-    int64_t curr_time = 0;
-    if (CONFIG::LOSS_EXPERIMENT::EXP == false) curr_time = get_current_time();
+    auto curr_time = get_current_time();
 
     if (CONFIG::HEDGING::INJECT_FAULT
         && ctx->proxy_num >= CONFIG::HEDGING::FAULTY_NODE_LOW
@@ -198,18 +195,16 @@ void prepare_and_transmit(
         curr_time = get_current_time();
     }
 
-    if (0 == ctx->proxy_num &&
-        false == CONFIG::SENDER_PROXY_GENERATES_MESSAGES &&
-        false == CONFIG::LOSS_EXPERIMENT::EXP) {
+    if (0 == ctx->proxy_num && false == CONFIG::SENDER_PROXY_GENERATES_MESSAGES) {
         msg->set_deadline(
             curr_time + ctx->holdrelease->get_owd_estimate_for_last_level()
             + CONFIG::HOLDRELEASE::EXTRA_HOLD_ADDED_TO_DEADLINE);
         msg->set_root_send_time(curr_time);
 
-        // assert(false == CONFIG::HEDGING::MSG_HISTORY);
+        assert(false == CONFIG::HEDGING::MSG_HISTORY);
     }
 
-    // bool is_parity_0_msg_id = 0 == (msg->msg_id() % CONFIG::HEDGING::PARITY);
+    bool is_parity_0_msg_id = 0 == (msg->msg_id() % CONFIG::HEDGING::PARITY);
 
     // Set the source MAC address
     struct rte_ether_addr new_src_addr = {
@@ -253,7 +248,7 @@ void prepare_and_transmit(
     */
     auto pkt_w_udp_hdr = rte_pktmbuf_adj(
         pkt, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr));
-    // assert(pkt_w_udp_hdr != NULL);
+    assert(pkt_w_udp_hdr != NULL);
 
     for (int i = 0; i < total_addrs_to_send_messages; i++) {
         for (int j = 0; j < CONFIG::REQUEST_DUPLICATION::FACTOR; j++) {
@@ -263,19 +258,19 @@ void prepare_and_transmit(
                 k %= (total_nodes_in_curr_level * ctx->m);
             }
 
-            // assert(k < ips_ports->size());
+            assert(k < ips_ports->size());
 
             /**
              * Clone the original packet
             */
             rte_mbuf* cloned_pkt = rte_pktmbuf_clone(pkt, clone_pool);
-            // assert(cloned_pkt != NULL);
+            assert(cloned_pkt != NULL);
 
             /**
              * Create a new mbuf for ethernet and udp headers
             */
             struct rte_mbuf *hdr = rte_pktmbuf_alloc(header_pool);
-            // assert(hdr != NULL);
+            assert(hdr != NULL);
 
             /**
              * Prepend hdr to cloned_pkt
@@ -297,7 +292,7 @@ void prepare_and_transmit(
 
             // Set the UDP header
             udphdr = (struct rte_udp_hdr *)rte_pktmbuf_prepend(hdr, (uint16_t)sizeof(*udphdr));
-            // assert(udphdr != NULL);
+            assert(udphdr != NULL);
 
             udphdr->dgram_len = udp_len;
             udphdr->dst_port = ips_ports->at(k).second;
@@ -306,7 +301,7 @@ void prepare_and_transmit(
 
             // Set the IP header
             iphdr = (struct rte_ipv4_hdr *)rte_pktmbuf_prepend(hdr, (uint16_t)sizeof(*iphdr));
-            // assert(iphdr != NULL);
+            assert(iphdr != NULL);
 
             iphdr->dst_addr = rte_be_to_cpu_32(ips_ports->at(k).first);
             iphdr->src_addr = new_src_ip;
@@ -322,7 +317,7 @@ void prepare_and_transmit(
 
             // Set the Ethernet header
             ethdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(hdr, (uint16_t)sizeof(*ethdr));
-            // assert(ethdr != NULL);
+            assert(ethdr != NULL);
 
             ethdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
             struct rte_ether_addr new_dst_addr = {
@@ -404,7 +399,7 @@ int worker_thread(void* arg) {
 
     while (true) {
         const uint16_t nb_rx = rte_ring_dequeue_burst(
-            packetQueue, reinterpret_cast<void **>(bufs), BURST_SIZE*4, NULL);
+            packetQueue, reinterpret_cast<void **>(bufs), BURST_SIZE*1, NULL);
 
         if (nb_rx == 0) continue;
 
@@ -416,8 +411,8 @@ int worker_thread(void* arg) {
                 args->tx_queue_id);
         }
 
-        // if (args->is_redundant) args->count += nb_rx;
-        // args->logs->at(args->tx_queue_id) += nb_rx;
+        if (args->is_redundant) args->count += nb_rx;
+        args->logs->at(args->tx_queue_id) += nb_rx;
     }
 
     return 0;
@@ -470,11 +465,11 @@ void receive_and_transmit_packets(
     std::set<int64_t> seen_msg_ids;
     int count = 0;
 
-    enqueue_failures = 0;
+    int64_t enqueue_failures = 0;
     std::vector<int> processed_by_worker(NUM_WORKERS, 0);
     if (true == CONFIG::LOGGING) {
         // yeah yeah it should not be put in the hedging threads
-        hedging_threads.emplace_back(std::thread([&processed_by_worker] {
+        hedging_threads.emplace_back(std::thread([&enqueue_failures, &processed_by_worker] {
             while (true) {
                 std::clog << "RECVD " << Logging::RECVD << " TRANSMITTED "
                 << Logging::TRANSMITTED << " FAILURES " << Logging::FAILURES <<
@@ -489,12 +484,6 @@ void receive_and_transmit_packets(
             }
         }));
     }
-
-    cpu_set_t cpuset;
-    int main_core = rte_get_main_lcore();
-    CPU_ZERO(&cpuset);
-    CPU_SET(main_core, &cpuset);
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 
     std::cout << "Launching " << NUM_WORKERS << " worker threads. " << std::endl;
     // Launch worker thread(s)
@@ -517,7 +506,6 @@ void receive_and_transmit_packets(
         rte_eal_remote_launch(worker_thread, args, i + 1);
     }
 
-    // isolate_main_core(main_core);
     int start_of_udphdr_in_pkt = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr);
 
     for (;;) {
@@ -557,89 +545,107 @@ void receive_and_transmit_packets(
     }
 }
 
-// TODO(haseeb): refactor both wait_command_prepare_*
-void wait_command_prepare_and_transmit_packets_helper_constant_rate_busywait(
+void wait_command_prepare_and_transmit_packets_helper(
     int experiment_time_in_seconds, int rate, int64_t starting_msg_id,
     Context *ctx, std::vector<std::pair<uint32_t, rte_be16_t>> &fast_ips_ports,
     std::vector<std::vector<uint8_t>>& fast_macs, uint32_t &src_ip,
-    std::vector<uint8_t>& src_mac) {
-
+    std::vector<uint8_t>& src_mac, struct rte_mempool *clone_pool,
+    struct rte_mempool *header_pool, int tx_queue_id) {
     std::cout << "Received a startmsg: "
-              << experiment_time_in_seconds << " " << rate << " " << starting_msg_id << std::endl;
+    << experiment_time_in_seconds << " " << rate << " " << starting_msg_id << std::endl;
 
     std::unique_ptr<Mcastmessages> mcastmessages = std::make_unique<Mcastmessages>(starting_msg_id);
 
-    double interarrival_time = 1.0 / rate;
+    double burst_rate = rate * CONFIG::BURST_FACTOR;
+    double burst_duration = 1.0;   // Burst duration in seconds
+    double burst_interval = 2.0;  // Time between bursts in seconds
+    int total_bursts = 0;
+
+    std::random_device rd;
+    std::mt19937 generator(321);
+    std::exponential_distribution<> exp_dist(rate);
+
     double curr_relative_time = 0;
+    auto next_time = std::chrono::system_clock::now();
     uint64_t total_messages = 0;
+
+    auto last_burst_time = std::chrono::system_clock::now();
+    bool in_burst_mode = false;
     int i = 0;
 
-    // struct rte_mbuf *bufs[BURST_SIZE];
-    enqueue_failures = 0;
-
-    MsgDp msg = mcastmessages->get_msg(i);
-
-    int batch_size = BURST_SIZE;
-    auto start_time = std::chrono::steady_clock::now();
-
     while (curr_relative_time < experiment_time_in_seconds) {
-        for (int b = 0; b < batch_size; b++) {
-            if (CONFIG::LOSS_EXPERIMENT::SIMULATE_LOSSES) {
-                if (i % 10000 == 0) i += 1;
-            }
+        double interarrival_time = exp_dist(generator);
 
-            struct rte_mbuf *pkt = rte_pktmbuf_alloc(mbuf_pool);
-            if (pkt == NULL) { printf("trouble at rte_pktmbuf_alloc\n"); return; }
+        auto current_time = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(
+            current_time - last_burst_time);
+
+        if (!in_burst_mode && CONFIG::BURSTY && elapsed_time.count() >= burst_interval) {
+            in_burst_mode = true;
+            last_burst_time = current_time;
+            exp_dist = std::exponential_distribution<>(burst_rate);
+            total_bursts++;
+        } else if (in_burst_mode && elapsed_time.count() >= burst_duration) {
+            in_burst_mode = false;
+            exp_dist = std::exponential_distribution<>(rate);
+        }
+
+        curr_relative_time += interarrival_time;
+
+        next_time += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::duration<double>(interarrival_time));
+
+        if (curr_relative_time < experiment_time_in_seconds) {
+            MsgDp msg = mcastmessages->get_msg(i);
+            msg.set_deadline(
+                get_current_time() + ctx->holdrelease->get_owd_estimate_for_last_level()
+                + CONFIG::HOLDRELEASE::EXTRA_HOLD_ADDED_TO_DEADLINE);
+
+            struct rte_mbuf *pkt;
+            pkt = rte_mbuf_raw_alloc(mbuf_pool);
+            if (pkt == NULL) { printf("trouble at rte_mbuf_raw_alloc\n"); return; }
+            rte_pktmbuf_reset_headroom(pkt);
             pkt->data_len = sizeof(MsgDp) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + sizeof(rte_ether_hdr);
-            pkt->pkt_len = pkt->data_len;
 
-            struct rte_ipv4_hdr  pkt_ip_hdr;
-            struct rte_udp_hdr pkt_udp_hdr;
+            static struct rte_ipv4_hdr  pkt_ip_hdr;
+            static struct rte_udp_hdr pkt_udp_hdr;
             struct rte_ether_hdr eth_hdr;
             eth_hdr.ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
             setup_pkt_udp_ip_headers(&pkt_ip_hdr, &pkt_udp_hdr, sizeof(MsgDp));
 
+            // copy header to packet in mbuf
             rte_memcpy(rte_pktmbuf_mtod_offset(pkt, char *, 0),
-                    &eth_hdr, sizeof(eth_hdr));
+                &eth_hdr, static_cast<size_t>(sizeof(eth_hdr)));
             rte_memcpy(rte_pktmbuf_mtod_offset(pkt, char *, sizeof(struct rte_ether_hdr)),
-                    &pkt_ip_hdr, sizeof(pkt_ip_hdr));
+                &pkt_ip_hdr, static_cast<size_t>(sizeof(pkt_ip_hdr)));
             rte_memcpy(rte_pktmbuf_mtod_offset(pkt, char *,
-                    sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv4_hdr)),
-                    &pkt_udp_hdr, sizeof(pkt_udp_hdr));
-            pkt->data_len = sizeof(MsgDp) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + sizeof(rte_ether_hdr);
-
-            mcastmessages->get_msg(msg, i);
-
+                sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv4_hdr)),
+                &pkt_udp_hdr, static_cast<size_t>(sizeof(pkt_udp_hdr)));
             rte_memcpy(rte_pktmbuf_mtod_offset(pkt, char *,
-                       sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv4_hdr)+sizeof(struct rte_udp_hdr)),
-                       &msg, sizeof(MsgDp));
+                sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv4_hdr)+sizeof(struct rte_udp_hdr)),
+                &msg, static_cast<size_t>(sizeof(MsgDp)));
 
+            // Add some pkt fields
             pkt->nb_segs = 1;
+            pkt->pkt_len = pkt->data_len;
             pkt->ol_flags = 0;
 
-            if (0 != rte_ring_enqueue(packetQueue, reinterpret_cast<void *>(pkt))) {
-                enqueue_failures += 1;
-                rte_pktmbuf_free(pkt);
-            }
-
+            prepare_and_transmit(
+                ctx, pkt, fast_ips_ports, fast_macs, src_ip, src_mac,
+                clone_pool, header_pool, false, false, tx_queue_id);
             i++;
             total_messages++;
+            std::this_thread::sleep_until(next_time);
         }
-
-        // Appropriate pacing to achieve desired rate
-        auto target_time = start_time + std::chrono::duration<double>(interarrival_time * total_messages);
-        while (std::chrono::steady_clock::now() < target_time) { _mm_pause(); }
-        curr_relative_time = std::chrono::duration<double>(
-            std::chrono::steady_clock::now() - start_time).count();
-        // if (total_messages >= rate * experiment_time_in_seconds) break;
     }
 
     rte_eth_stats stats;
     rte_eth_stats_get(PORT_ID, &stats);
     printf("TX: Packets: %lu, Errors: %lu, Bytes: %lu\n",
-           stats.opackets, stats.oerrors, stats.obytes);
+       stats.opackets, stats.oerrors, stats.obytes);
 
     std::clog << "Msg size: " << sizeof(MsgDp) << std::endl;
+    std::clog << "Total bursts: " <<  total_bursts << std::endl;
     std::clog << "Done generating [ " << total_messages << " ] orders!" << std::endl;
     std::clog << "Next Message ID: " << starting_msg_id + i << std::endl;
 }
@@ -662,45 +668,48 @@ void wait_command_prepare_and_transmit_packets(
 
     printf("\nCore %u receiving packets. [Ctrl+C to quit]\n", rte_lcore_id());
 
+    NUM_WORKERS = 1;
+
     int start_of_udphdr_in_pkt = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr);
 
-    std::vector<std::thread> threads;
-    if (true == CONFIG::LOGGING) {
-        threads.emplace_back(std::thread([] {
-            while (true) {
-                std::clog << " enqueue_failures: " << enqueue_failures << std::endl;
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            }
-        }));
+    ////////////////////////// Creating Required Memory Pools //////////////////////////
+    std::string clone_pool_name = "CLONE_POOL" + std::to_string(0);
+    std::string header_pool_name = "HEADER_POOL" + std::to_string(0);
+    double total_mem_to_allocate = (1.0 * NUM_MBUFS / NUM_WORKERS) * ctx->m;
+
+    if (CONFIG::HEDGING::SIBLING_BASED_HEDGING) {
+        total_mem_to_allocate *= 2;
     }
 
-    cpu_set_t cpuset;
-    int main_core = rte_get_main_lcore();
-    CPU_ZERO(&cpuset);
-    CPU_SET(main_core, &cpuset);
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-    // isolate_main_core(main_core);
+    total_mem_to_allocate *= CONFIG::REQUEST_DUPLICATION::FACTOR;
 
-    std::cout << "Launching " << NUM_WORKERS << " worker threads. " << std::endl;
-    // Launch worker thread(s)
-    for (int i = 0; i < NUM_WORKERS; ++i) {
-        Workerthreadargs* args = new Workerthreadargs{
-            .clone_pool = NULL,
-            .header_pool = NULL,
-            .count = 0,
-            .ctx = ctx,
-            .fast_ips_ports = fast_ips_ports,
-            .fast_macs = fast_macs,
-            .is_leaf_node = false,
-            .is_redundant = false,
-            .src_ip = ip,
-            .src_mac = mac,
-            .tx_queue_id = i,
-            .logs = NULL
-        };
+    std::clog << "Attempting allocation of "
+    << clone_pool_name << " at " << rte_socket_id() << " worth "
+    << total_mem_to_allocate*0 << "B" << std::endl;
 
-        rte_eal_remote_launch(worker_thread, args, i + 1);
+    struct rte_mempool *clone_pool = rte_pktmbuf_pool_create(
+        clone_pool_name.c_str(), total_mem_to_allocate * 2 /* Number of segments*/ * 2, MBUF_CACHE_SIZE,
+        0, 0, rte_socket_id());
+
+    std::clog << "Attempting allocation of "
+    << header_pool_name << " at " << rte_socket_id() << " worth "
+    << total_mem_to_allocate*HEADERS_MBUF_SIZE << "B" << std::endl;
+
+    struct rte_mempool *header_pool = rte_pktmbuf_pool_create(
+        header_pool_name.c_str(), total_mem_to_allocate, MBUF_CACHE_SIZE,
+        0, HEADERS_MBUF_SIZE, rte_socket_id());
+
+    if (clone_pool == NULL) {
+        std::cerr << rte_errno << " Could not allocate " << clone_pool_name << std::endl;
+        exit(1);
     }
+
+    if (header_pool == NULL) {
+        std::cerr << rte_errno << " Could not allocate " << header_pool_name << std::endl;
+        exit(1);
+    }
+
+    ////////////////////////// Done Creating Required Memory Pools //////////////////////////
 
     for (;;) {
         RTE_ETH_FOREACH_DEV(port) {
@@ -722,16 +731,13 @@ void wait_command_prepare_and_transmit_packets(
                 }
 
                 StartMsgsDp *msg =  reinterpret_cast<StartMsgsDp *>(udp_hdr + 1);
-                wait_command_prepare_and_transmit_packets_helper_constant_rate_busywait(
+                wait_command_prepare_and_transmit_packets_helper(
                     msg->experiment_time_in_seconds, msg->msg_rate, msg->starting_msg_id,
-                    ctx, fast_ips_ports, fast_macs, ip, mac);
+                    ctx, fast_ips_ports, fast_macs, ip, mac,
+                    clone_pool, header_pool, 0 /* The same as in workerthreadargs*/);
                 rte_pktmbuf_free(bufs[i]);
             }
         }
-    }
-
-    for (auto& thr : threads) {
-        if (thr.joinable()) thr.join();
     }
 }
 
@@ -741,8 +747,6 @@ void exit_stats(int sig) {
 }
 
 void dpdk_proxy(Context *ctx, std::string mode, std::vector<std::string> ips) {
-    std::cout << "PID: " << getpid() << std::endl;
-    std::cout << "If crash occurs, core will be at /tmp/core.multicast_proxy." << getpid() << std::endl;
     unsigned nb_ports;
     uint16_t portid;
     std::string cloud {CONFIG::CLOUD};
@@ -758,9 +762,9 @@ void dpdk_proxy(Context *ctx, std::string mode, std::vector<std::string> ips) {
     /* Creates a new mempool in memory to hold the mbufs. */
     mbuf_pool = rte_pktmbuf_pool_create(
         "MBUF_POOL", NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0,
-        RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());  // gvnic requires RTE_MBUF_DEFAULT_BUF_SIZE
+        RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
 
-    packetQueue = rte_ring_create("PacketQueue", 131072, rte_socket_id(), RING_F_SP_ENQ | RING_F_MC_HTS_DEQ);
+    packetQueue = rte_ring_create("PacketQueue", 4096, rte_socket_id(), RING_F_SP_ENQ | RING_F_MC_HTS_DEQ);
     if (packetQueue == NULL)
         rte_panic("Cannot create packet queue\n");
 

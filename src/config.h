@@ -30,18 +30,12 @@ namespace CONFIG {
 
     const bool SIMULATE_TRADING = false;
 
-namespace LOSS_EXPERIMENT {
-    const bool EXP = false;
-    const bool LOGGING = false;
-    const bool SIMULATE_LOSSES = false;
-}
-
 namespace REQUEST_DUPLICATION {
     const int FACTOR = 1;  // means a total of `x` requests will be sent (i.e., a total of x-1 new copies)
 }
 
 namespace HEDGING {
-    const bool DYNAMIC_RELATIONSHIPS = true;  // only works with H=0,1,2
+    const bool DYNAMIC_RELATIONSHIPS = true;  // only works with H=0,1,2 Make this false
 
     // Not being used rn
     const bool MSG_HISTORY = false;  // REMEMBER TO INCREASE MSG SIZE FOR FAIR SIMULATTION!!!
@@ -94,12 +88,12 @@ namespace HOLDRELEASE {
         NONE
     };
 
-    const HOLDRELEASE_MODE_TYPE HOLDRELEASE_MODE = HOLDRELEASE_MODE_TYPE::END_TO_END;
+    const HOLDRELEASE_MODE_TYPE HOLDRELEASE_MODE = HOLDRELEASE_MODE_TYPE::END_TO_END;  // DU: NONE
 }  // namespace HOLDRELEASE
 
 // Only works for sockets mode right now
 namespace ORDERS_SUBMISSION {
-    const bool LOGGING = true;
+    const bool LOGGING = false;
     const bool STRESS_TEST = true;
     const int COLLECTIVE_RATE = 100'000;  // of all the traders, in orders/second
     const int SEQUENCER_DELAY = 400;  // microseconds
@@ -110,17 +104,17 @@ namespace ORDERS_SUBMISSION {
     const char* ALOGS_FILE = "alogs.csv";  // all logs
     const char* QLOGS_FILE = "qlogs.csv";  // all logs
     const int FIXED_PACING_VAL = 0;  // is only used when DYNAMIC_PACING is false
-    const bool DYNAMIC_PACING = false;
+    const bool DYNAMIC_PACING = true;
     bool BURST_MODE = true;
     const int BURST_FACTOR = 20;
-    const int QTYPE = 0;  // 0 for simplepq, 1 for fancypq/loq
+    const int QTYPE = 0;  // 0 for simplepq, 1 for fancy(i.e., LOQv1), 2 for LOQv2
     const int MID_PRICE = 5;
     const int ACTION_WINDOW = 0;
     const int OWD_THRESH = 70;
     const bool PROXY_SEQUENCE = false;  // do we want the proxies to do sequencing?
     const bool ALWAYS_USE_SINGLE_PUBLISHER = true;
     const int THRESH_FOR_DUMMY_GENERATION = 1'000;  // microseconds
-    const bool DUMMY_GENERATION = true;
+    const bool DUMMY_GENERATION = false;
 }  // namespace ORDERS_SUBMISSION
 
 }  // namespace CONFIG
