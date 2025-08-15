@@ -8,13 +8,13 @@ import argparse
 script_location = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.join(script_location, "../")
 
-STACK_NAME = "test"
+STACK_NAME = "haoTest"
 STACK_FILE = "./_stack.json"
-BKT_NAME = "cf-templates-haseeb"
+BKT_NAME = "cf-templates-hao"
 TOTAL_SPLIT_STACK_PIECES = 2
 
 deploy_cmd = f"aws cloudformation deploy --stack-name {STACK_NAME} --template-file {STACK_FILE} --region us-east-2"
-deploy_large_cmd = f"aws cloudformation deploy --stack-name {STACK_NAME} --template-file {STACK_FILE} --region us-east-2 --s3-bucket cf-templates-haseeb"
+deploy_large_cmd = f"aws cloudformation deploy --stack-name {STACK_NAME} --template-file {STACK_FILE} --region us-east-2 --s3-bucket {BKT_NAME}"
 delete_cmd = f"aws cloudformation delete-stack --stack-name {STACK_NAME} --region us-east-2"
 validate_cmd = f"aws cloudformation validate-template --template-body file://{STACK_FILE[2:]}"
 
@@ -28,6 +28,8 @@ def next_ip(ip, i):
     return ".".join(octets)
 
 def get_total_redundant_proxies(total_proxies, proxy_tree_branching_factor, redundancy_factor):
+    if proxy_tree_branching_factor == 0:
+        return 0
     total_internal_nodes = (total_proxies-1)/proxy_tree_branching_factor
     return int(total_internal_nodes * redundancy_factor)
 
@@ -232,6 +234,10 @@ def create_template(total_recipients, total_proxies=1, redundancy_factor=1, tota
                         "DeviceIndex": "0"
                     }
                 ]
+        stack["Resources"][f"ClientVM{i}"]["Properties"]["Tags"] = [{
+                "Key": "Name",
+                "Value": f"ClientVM{i}"
+            }]
 
     total_redundant_proxies = get_total_redundant_proxies(total_proxies, proxy_tree_branching_factor, redundancy_factor)
     for i in range(0, total_proxies+total_redundant_proxies):
@@ -249,6 +255,10 @@ def create_template(total_recipients, total_proxies=1, redundancy_factor=1, tota
             },
             "DeviceIndex": "0"
         }]
+        stack["Resources"][f"ProxyVM{i}"]["Properties"]["Tags"] = [{
+                "Key": "Name",
+                "Value": f"ProxyVM{i}"
+            }]
 
     for i in range(0, int(total_recipients/dup_num)):
         if run_mode != "awstg":
@@ -277,7 +287,10 @@ def create_template(total_recipients, total_proxies=1, redundancy_factor=1, tota
             }]
             stack["Resources"][f"MCMember{i}"] = get_resource("mc_member", i, values, new_ips, "recipient")
 
-
+        stack["Resources"][f"RecipientVM{i}"]["Properties"]["Tags"] = [{
+            "Key": "Name",
+            "Value": f"RecipientVM{i}"
+        }]
     write_new_ips_config(new_ips, values["port"], dup_num)
 
     with open("./_stack.json", "w") as f:
@@ -286,7 +299,7 @@ def create_template(total_recipients, total_proxies=1, redundancy_factor=1, tota
     resource_types = ["ProxyVM", "EAssociation", "ENI", "EIP", "ClientVM", "RecipientVM"]
     make_stack_files("./_stack", resource_types, stack)
     
-    show_ip_ranges(new_ips)
+    #show_ip_ranges(new_ips)
 
 def deploy_template(option=1):
     print("Creating bundle of project")

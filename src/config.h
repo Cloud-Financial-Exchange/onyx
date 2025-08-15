@@ -6,7 +6,7 @@
 #include <cstdint>
 
 namespace CONFIG {
-    const int MSG_RATE = 175'000;
+    const int MSG_RATE = 5'000;
     const bool BURSTY = false;
     const int BURST_FACTOR = 1;
     const bool LOGGING = true;
@@ -21,10 +21,10 @@ namespace CONFIG {
     const bool XDP_BASED_DEDUP = ENFORCE_SOCKET_RECEIVER && false;
 
     // Storage related configs
-    // const char* S3_STATS_BUCKET = "expresults";  // aws
-    const char* S3_STATS_BUCKET = "exp-results-nyu-systems-multicast";  // gcp
-    const char* CLOUD = "gcp";
-    // const char* CLOUD = "aws";
+    const char* S3_STATS_BUCKET = "expresults";  // aws
+    // const char* S3_STATS_BUCKET = "exp-results-nyu-systems-multicast";  // gcp
+    // const char* CLOUD = "gcp";
+    const char* CLOUD = "aws";
 
     const int CRITICAL_PATH_SEEN_IDS_MAP_CLEARING_THRESH = MSG_RATE;
 
@@ -46,7 +46,7 @@ namespace HEDGING {
     // Not being used rn
     const bool MSG_HISTORY = false;  // REMEMBER TO INCREASE MSG SIZE FOR FAIR SIMULATTION!!!
 
-    const bool SIBLING_BASED_HEDGING = false;  // safe to set if false, w/o changing intensity
+    const bool SIBLING_BASED_HEDGING = true;  // Make this false for DU
     const int SIBLING_HEDGING_INTENSITY = 2;  // value of x means that x siblings will be hedged by a proxy
     // Hedging related config
     enum HEDGING_MODE_TYPE {
@@ -83,7 +83,7 @@ namespace HEDGING {
 
 namespace HOLDRELEASE {
     int DEFAULT_OWD = 50;  // microseconds
-    int EXTRA_HOLD_ADDED_TO_DEADLINE = 25;  // microseconds
+    int EXTRA_HOLD_ADDED_TO_DEADLINE = 10;  // microseconds
     double TARGET_PERCENTILE_FOR_OWD_ESTIMATE = 97.0;
     int WINDOW_SIZE_MILLISECONDS = 10;
     int SENDING_ESTIMATE_FREQUENCY_IN_MILLISECONDS = 15;

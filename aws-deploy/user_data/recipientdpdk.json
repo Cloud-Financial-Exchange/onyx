@@ -16,12 +16,12 @@
     "cd ./dom-tenant-service/\n",
     "cd src/kernel_modules/igb_uio\n",
     "ip link set dev ens6 down\n",
-    "# sysctl -w vm.nr_hugepages=5000\n",
+    "sysctl -w vm.nr_hugepages=4000\n",
     "sudo ./install.sh || sudo ./install.sh\n",
-    "cd ../../../../dpdk-stable*\n",
+    "cd /work/dpdk-23.07/\n", 
     "sudo ./usertools/dpdk-devbind.py --bind=igb_uio 00:06.0\n",
     "sudo ./usertools/dpdk-devbind.py --status\n",
-    "cd ../dom-tenant-service/\n",
+    "cd /home/ubuntu/dom-tenant-service/\n",
     "cd aws-deploy\n",
     "sudo chmod +x ./stats_to_s3.sh\n",
     "sudo chmod +x ./deploy_ttcs.sh\n",
@@ -34,7 +34,6 @@
     "cd ./src\n",
     "# sudo ip link set dev ens5 mtu 3498\n",
     "# sudo ethtool -L ens5 combined 1\n",
-    "clang -g -O2 -Wall -target bpf -I ~/iproute2/include/ -c ./multicast_receiver/xdp-deduplication.c -o xdp-deduplication.o\n",
     "make multicast_receivers\n",
     "./build/multicast_receivers INSTANCE_NUM DUPLICATION_FACTOR RUN_MODE BRANCHING_FACTOR REDUNDANCY_FACTOR TOTAL_NON_REDUNDANT_PROXIES\n"
 ]

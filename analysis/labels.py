@@ -233,7 +233,11 @@ labels = [
     # "300s_may12_924",
     # "300s_175k_may12_937",
     # "600s_175k_159",
-    "600s_175k_100r_222",  # used for loss_exp
+    # "600s_175k_100r_222",  # used for loss_exp
+	
+	# AWS artifact eval
+    "onyx_100_rcvr",
+    "du_100_rcvr",
 ]
 
 
@@ -413,15 +417,10 @@ texts = {
 
     "socket_may_6_test": "socket_may_6_test",
     "2socket_may_6_test": "socket_may_6_test",
-    "dpdk_test_25r": "dpdk_test_25r",
-    "2dpdk_test_25r": "dpdk_test_25r",
-    "dpdk_big_test": "dpdk_big_test",
-    "drop_test_may10_521": "drop_test_may10_521",
-    "300s_may12_608": "300s_may12_608",
-    "300s_may12_924": "300s_may12_924",
-    "300s_175k_may12_937": "300s_175k_may12_937",
-    "600s_175k_159": "600s_175k_159",
-    "600s_175k_100r_222": "600s_175k_100r_222",
+	
+    # AE..
+    "onyx_100_rcvr": "Onyx 100 Receivers 10 Proxy",
+    "du_100_rcvr": "Single Proxy Unicast 100 Receivers",
 }
 
 info = {
@@ -577,16 +576,8 @@ info = {
     
     "socket_may_6_test": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 120, "starting_id": 50000, "parity": False},
     "2socket_may_6_test": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 120, "starting_id": 50000, "parity": False},
-    "dpdk_test_25r": {"num_receivers": 25, "msg_rate": 5000, "total_seconds": 60, "starting_id": 50047, "parity": False},
-    "2dpdk_test_25r": {"num_receivers": 25, "msg_rate": 5000, "total_seconds": 60, "starting_id": 50047, "parity": False},
-    "dpdk_big_test": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 60, "starting_id": 50047, "parity": False},
-    "drop_test_may10_521": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 60, "starting_id": 50047, "parity": False},
-    "300s_may12_608": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 60, "starting_id": 50047, "parity": False},
-    "300s_may12_924": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 60, "starting_id": 50047, "parity": False},
-    "300s_175k_may12_937": {"num_receivers": 100, "msg_rate": 175000, "total_seconds": 300, "starting_id": 50047, "parity": False},
-    "600s_175k_159": {"num_receivers": 10, "msg_rate": 175000, "total_seconds": 600, "starting_id": 1750016, "parity": False},
-    "600s_175k_100r_222": {"num_receivers": 100, "msg_rate": 175000, "total_seconds": 600, "starting_id": 875008, "parity": False},
-
+    
+    
     "5k_hr_h2_100r_sep13_454": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 30, "starting_id": 200040, "parity": False},
     "5k_hr_h2_100r_sep13_459": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 150, "starting_id": 1350033, "parity": False},
     "cloudex_sep13_539": {"num_receivers": 100, "msg_rate": 5000, "total_seconds": 150, "starting_id": 1350033, "parity": False},

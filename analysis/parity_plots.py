@@ -252,7 +252,7 @@ def plot_all(
             data_transformation=data_transformation)
 
         plt.tight_layout()
-        plt.legend(fontsize='large', prop={'size': 22}) #fontsize='large'
+        plt.legend(fontsize='small', prop={'size': 10}) #fontsize='large'
         # plt.legend() #fontsize='large'
 
         if save_each_file:

@@ -13,10 +13,10 @@
           }
         ],
         "IamInstanceProfile": "reads3fromec2",
-        "ImageId" : "ami-0476a3bebc1562489",
+        "ImageId" : "ami-08914772284143feb",
         "InstanceInitiatedShutdownBehavior" : "terminate",
         "InstanceType" : "c5.2xlarge",
-        "KeyName" : "duclos-zmq",
+        "KeyName" : "hao",
         "NetworkInterfaces" : [{
             "DeleteOnTermination" : "true",
             "DeviceIndex" : "1",

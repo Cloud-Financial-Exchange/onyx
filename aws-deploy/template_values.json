@@ -7,7 +7,7 @@
             "base_recipient_management_ip": "172.25.13.0",
             "base_recipient_vm_ip": "172.25.16.232",
             "port": "34254",
-            "subnet_id": "subnet-014d9a51a64e2b19e",
+            "subnet_id": "subnet-02b75137502001246",
             "sg_id": "sg-0e6fa0bdbd2e06e94"
         },
         {
