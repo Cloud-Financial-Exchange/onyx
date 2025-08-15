@@ -31,8 +31,8 @@ namespace CONFIG {
     const bool SIMULATE_TRADING = false;
 
 namespace LOSS_EXPERIMENT {
-    const bool EXP = true;
-    const bool LOGGING = true;
+    const bool EXP = false;
+    const bool LOGGING = false;
     const bool SIMULATE_LOSSES = false;
 }
 
@@ -41,7 +41,7 @@ namespace REQUEST_DUPLICATION {
 }
 
 namespace HEDGING {
-    const bool DYNAMIC_RELATIONSHIPS = false;  // only works with H=0,1,2
+    const bool DYNAMIC_RELATIONSHIPS = true;  // only works with H=0,1,2
 
     // Not being used rn
     const bool MSG_HISTORY = false;  // REMEMBER TO INCREASE MSG SIZE FOR FAIR SIMULATTION!!!
@@ -94,7 +94,7 @@ namespace HOLDRELEASE {
         NONE
     };
 
-    const HOLDRELEASE_MODE_TYPE HOLDRELEASE_MODE = HOLDRELEASE_MODE_TYPE::NONE;
+    const HOLDRELEASE_MODE_TYPE HOLDRELEASE_MODE = HOLDRELEASE_MODE_TYPE::END_TO_END;
 }  // namespace HOLDRELEASE
 
 // Only works for sockets mode right now
