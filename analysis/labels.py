@@ -419,8 +419,8 @@ texts = {
     "2socket_may_6_test": "socket_may_6_test",
 	
     # AE..
-    "onyx_100_rcvr": "Onyx 100 Receivers 10 Proxy",
-    "du_100_rcvr": "Single Proxy Unicast 100 Receivers",
+    "onyx_100_rcvr": "Onyx",
+    "du_100_rcvr": "DU",
 }
 
 info = {
