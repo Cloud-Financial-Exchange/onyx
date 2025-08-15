@@ -2,6 +2,10 @@
 
 Screen-recording of performing LOQ vs SimplePQ experiment: https://drive.google.com/file/d/10Dj5JegVj_nPwQDfX3M13ls0BzEv7Kj2/view?usp=sharing
 
+I first run order submission for SimplePQ. Then I destroy the stack, change the config.h to use LOQ and then re-deploy and run order submission again. 
+
+Then I analyze the two files created from the two experiments to create a plot.
+
 
 ## Usage
 
