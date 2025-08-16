@@ -237,7 +237,6 @@ labels = [
 	
 	# AWS artifact eval
     "onyx_h2_100_rcvr",
-    "onyx_h0_100_rcvr",
     "cloudex_100_rcvr",
 ]
 
@@ -421,7 +420,6 @@ texts = {
 	
     # AE..
     "onyx_h2_100_rcvr": "Onyx, H=2",
-    "onyx_h0_100_rcvr": "Onyx, H=0",
     "cloudex_100_rcvr": "CloudEx",
 }
 

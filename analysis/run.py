@@ -153,7 +153,7 @@ def latency_plots():
 
     plot_all(labels, texts, False, util.Graph.CDF, False, PERCENTILES_TO_SHOW, get_max_owd_data_transformation_fn)
     plot_all(labels, texts, False, util.Graph.CDF, False, PERCENTILES_TO_SHOW, get_diff_between_max_min_owd_data_transformation_fn)
-    # plot_all(labels, texts, False, util.Graph.CDF, False, PERCENTILES_TO_SHOW, get_mean_holding_duration_data_transformation_fn)
+    plot_all(labels, texts, False, util.Graph.CDF, False, PERCENTILES_TO_SHOW, get_mean_holding_duration_data_transformation_fn)
     # plot_all(labels, texts, False, util.Graph.CDF, False, PERCENTILES_TO_SHOW, get_max_holding_duration_data_transformation_fn)
 
     # plot_all(labels, texts, True, util.Graph.PERCENTAGE_IMPROVEMENT_PER_PERCENTILE, False, PERCENTILES_TO_SHOW, get_max_owd_data_transformation_fn)
