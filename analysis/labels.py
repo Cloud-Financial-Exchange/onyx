@@ -236,8 +236,9 @@ labels = [
     # "600s_175k_100r_222",  # used for loss_exp
 	
 	# AWS artifact eval
-    "onyx_100_rcvr",
-    "du_100_rcvr",
+    "onyx_h2_100_rcvr",
+    "onyx_h0_100_rcvr",
+    "cloudex_100_rcvr",
 ]
 
 
@@ -419,8 +420,9 @@ texts = {
     "2socket_may_6_test": "socket_may_6_test",
 	
     # AE..
-    "onyx_100_rcvr": "Onyx",
-    "du_100_rcvr": "DU",
+    "onyx_h2_100_rcvr": "Onyx, H=2",
+    "onyx_h0_100_rcvr": "Onyx, H=0",
+    "cloudex_100_rcvr": "CloudEx",
 }
 
 info = {
