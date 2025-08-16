@@ -1,11 +1,20 @@
 ## For SIGCOMM Artifact Evaluation
 
+Onyx main contributions include low latency multicast and an LOQ which handles bursts effectively. 
+We perform experiments to validate these two points and record our screen while performing the experiments.
+
+### Figure 9 replication (LOQ vs SimplePQ)
 Screen-recording of performing LOQ vs SimplePQ experiment: https://drive.google.com/file/d/10Dj5JegVj_nPwQDfX3M13ls0BzEv7Kj2/view?usp=sharing
 
 I first run order submission for SimplePQ. Then I destroy the stack, change the config.h to use LOQ and then re-deploy and run order submission again. 
 
 Then I analyze the two files created from the two experiments to create a plot.
 
+### Figure 5 replication (Onyx vs Direct Unicasts)
+
+We omit a comparison with AWS TGW for this figure because of time constraints. However Onyx is still compared with DU to validate its effectivess. 
+
+Video link: https://drive.google.com/file/d/1ctsZgqm-8bem-u16BaVtk99dNlsIeU3x/view?usp=sharing
 
 ## Usage
 
