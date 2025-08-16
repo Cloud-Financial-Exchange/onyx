@@ -16,6 +16,13 @@ We omit a comparison with AWS TGW for this figure because of time constraints. H
 
 Video link: https://drive.google.com/file/d/1ctsZgqm-8bem-u16BaVtk99dNlsIeU3x/view?usp=sharing
 
+### Figure 6 replication (Onyx DWS vs CloudEx DWS)
+
+Following video shows Onyx's comparison with CloudEx (and Onyx H = 0). The plots look different from the ones in the paper, but overall claims still stand: Onyx H=2 performs better than CloudEx and Onyx H = 0. The difference in the plots perhaps can be attributed to transiet change in the underlying cloud fabric's conditions which are not under our control, but in any case the effectiveness of Onyx still holds. 
+
+Video Link: https://drive.google.com/file/d/1RB3jDTvm8jSXp6OieXGXUaoV_spPhmhC/view?usp=drive_link
+
+
 ## Usage
 
 #### On AWS
