@@ -30,10 +30,10 @@ Video Link: https://drive.google.com/file/d/1RB3jDTvm8jSXp6OieXGXUaoV_spPhmhC/vi
 1. Use aws-deploy/run.py script to generate a CloudFormation template using create_template argument to the script. 
 
     For example, we want to have 10 receivers, 3 proxies, 1 client, with a branching factor of 2, utilize configuration 0. Then we run:
-``python3 run.py create-template -r 10 -p 3 -b 2 -c 1 -rm dpdk -dm large -conf 0``.
+```python3 run.py create-template -r 10 -p 3 -b 2 -c 1 -rm dpdk -dm large -conf 0```.
 2. Use ``python3 run.py deploy-stack -dm large `` which will use the CloudFormation templates generated in the previous step. The script will also bundle the project into a `.tar` and upload it to S3, which will be pulled in each VM in the stack(s).
 
-3. When done, ``python3 run.py delete-stack``.
+3. When done, ```python3 run.py delete-stack```.
 
 #### On GCP
 
@@ -124,9 +124,9 @@ Notes:
 
     b. Then  run `./build/multicast_client -a messages -t 10 -i 0 -s test` for doing the measurements. -t shows the duration (in seconds) for the experiment, -s shows the prefix for the directory in which results would be stored in aws s3. -i shows the starting message id for the messages. Use 0 starting message id when runnning for the first time. 
 
-## Architecture
+## Code Architecture
 
-All roles are consisted with 2 parts: **controller** and **worker** threads. Controller is responsible for the Management Message (through TCP connection), while worker is responsible for the actual work related to multicasting.
+All roles (client, proxy, receiver) are consisted of 2 parts: **controller** and **worker** threads. Controller is responsible for the Management Message (through TCP connection), while worker is responsible for the actual work related for example multicasting and order submission.
 
 - Client: 
     - Controller: Currently it only collects MAC addresses from all receivers and proxies then distributes MACs to proxies by establishing a TCP connection to all VMs. *(TODO: Add failure detection)*
