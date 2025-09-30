@@ -23,6 +23,20 @@ Following video shows Onyx's comparison with CloudEx (and Onyx H = 0). The plots
 Video Link: https://drive.google.com/file/d/1RB3jDTvm8jSXp6OieXGXUaoV_spPhmhC/view?usp=drive_link
 
 
+### Quick guide for other figures replication
+To replicate figures other than the above (5, 6, 9), you would need access to a cloud platform with enough balance to perform the experiments. The balance required for an experiment can be calculated by the number of VMs required for each experiment as that is the only major cost. 
+
+Onyx requires constructing a tree so appropriate branching factor needs to be passed to the `create-template` command (more info in Usage section below), also shown in the above videos. For 1000 receivers, `create-template` command would need the ```-p 111 -b 10``` parameters (i.e., 111 proxies are needed and a tree of branching factor 10 needs to be constructed). For 100 receivers, it is ```-p 11 -b 10```. 
+
+Once a template is created, it is deployed to a cloud platform using the `deploy-stack` command. Once all VMs have been deployed, ssh into the client VM (it will have `client` in the name) and perform submit requests for running multicast or order submission. 
+
+The src/config.h has all the configurations that can be used to tune the experiments i.e., turn on/off the hold-and-release or hedging or configure the message rates. This configuration file should be changed before creating and deploying the VMs. 
+
+`src/multicast_client/multicast_client.cpp` has all the options for any commands and can be visualized by the running the client with `-h` option. These options show how to run multicast experiment or order submission experiment or how to store all the statistics to a remote storage (e.g., GCS or S3). 
+
+Once all the statistics are stored in a remote storage, the analysis scripts in the `analysis/` directory are used to plot figures. Running `analysis/run.py` with `-h` shows all the options. 
+
+
 ## Usage
 
 #### On AWS
