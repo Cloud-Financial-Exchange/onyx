@@ -264,8 +264,23 @@ def deploy_stack(split=False):
     if not split:
         subprocess.run(get_deploy_cmd(), shell=True)
     else:
-        for i in range(0, 6):
-            subprocess.run(get_deploy_cmd(i), shell=True)
+        processes = []
+        for i in range(0,3):
+            p = subprocess.Popen(get_deploy_cmd(i), shell=True)
+            processes.append(p)
+
+        # join (wait for all to finish)
+        for p in processes:
+            p.wait()
+
+        processes = []
+        for i in range(3,6):
+            p = subprocess.Popen(get_deploy_cmd(i), shell=True)
+            processes.append(p)
+
+        # join (wait for all to finish)
+        for p in processes:
+            p.wait()
 
     print("Cleaning up targets")
     subprocess.run(f"rm {script_location}/bundled_proj.tar.gz", shell=True)
@@ -274,8 +289,14 @@ def delete_stack(split=False):
     if not split:
         subprocess.run(get_delete_cmd(), shell=True)
     else:
-        for i in range(0, 6):
-            subprocess.run(get_delete_cmd(i), shell=True)
+        processes = []
+        for i in range(6):
+            p = subprocess.Popen(get_delete_cmd(i), shell=True)
+            processes.append(p)
+
+        # join (wait for all to finish)
+        for p in processes:
+            p.wait()
 
     print("Cleaning up bucket")
     subprocess.run(f"gsutil -m rm -r gs://{BKT_NAME}/*", shell=True)

@@ -21,10 +21,10 @@ namespace CONFIG {
     const bool XDP_BASED_DEDUP = ENFORCE_SOCKET_RECEIVER && false;
 
     // Storage related configs
-    const char* S3_STATS_BUCKET = "expresults";  // aws
-    // const char* S3_STATS_BUCKET = "exp-results-nyu-systems-multicast";  // gcp
-    // const char* CLOUD = "gcp";
-    const char* CLOUD = "aws";
+    // const char* S3_STATS_BUCKET = "expresults";  // aws
+    const char* S3_STATS_BUCKET = "exp-results-nyu-systems-multicast";  // gcp
+    const char* CLOUD = "gcp";
+    //const char* CLOUD = "aws";
 
     const int CRITICAL_PATH_SEEN_IDS_MAP_CLEARING_THRESH = MSG_RATE;
 
