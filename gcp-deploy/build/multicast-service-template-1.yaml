@@ -61,11 +61,11 @@ resources:
       - key: CLOUD
         value: gcp
       - key: BRANCHING_FACTOR
-        value: '2'
+        value: '1'
       - key: REDUNDANCY_FACTOR
         value: '0'
       - key: TOTAL_NON_REDUNDANT_PROXIES
-        value: '3'
+        value: '2'
       - key: DUPLICATION_FACTOR
         value: '1'
     networkInterfaces:

@@ -19,7 +19,7 @@ from pathlib import Path
 
 # Returns {msg_id: [max owd, min owd, holding time summed across all receivrs]}
 def get_data_per_msg_id(filename, result, metadata):
-    data = util.read_and_deserialize_data(filename, False, True)
+    data = util.read_and_deserialize_data(filename, False, False)
     print("Rows: ", len(data))
     for row in data:
         msg_id = int(row[0])
