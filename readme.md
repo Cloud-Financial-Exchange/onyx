@@ -23,6 +23,16 @@ Following video shows Onyx's comparison with CloudEx (and Onyx H = 0). The plots
 Video Link: https://drive.google.com/file/d/1RB3jDTvm8jSXp6OieXGXUaoV_spPhmhC/view?usp=drive_link
 
 
+### Delivery Window Size for 1000 receivers
+
+It is a long experiment, so the video is divided into two parts and main figure generations timestamp is provided below. 
+
+Experiment Performed: https://drive.google.com/file/d/1PwcQCNePjJZgLQoso4qkB90X3m2rI8Pk/view?usp=sharing
+
+Data Analysis: https://drive.google.com/file/d/1NAmPdadUnUI-S03ylG3DhDjXhoi20hx0/view?usp=sharing
+
+Timestamp for delivery window size (i.e., less than 1 microsecond latency difference across receivers): 1:42:42 in the second video
+
 ### Quick guide for other figures replication
 To replicate figures other than the above (5, 6, 9), you would need access to a cloud platform with enough balance to perform the experiments. The balance required for an experiment can be calculated by the number of VMs required for each experiment as that is the only major cost. 
 
